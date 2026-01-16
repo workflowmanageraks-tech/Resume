@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>Bookmark Manager</title>
-
 <style>
 body{
     font-family: Arial, sans-serif;
@@ -31,11 +30,11 @@ input, select{
     margin:6px 0;
 }
 button{
-    padding:8px 12px;
-    margin:5px 5px 5px 0;
+    padding:6px 10px;
+    margin:3px 3px 3px 0;
     cursor:pointer;
 }
-.bookmark{
+.bookmark, .label-item{
     background:#eef;
     padding:10px;
     margin-top:10px;
@@ -44,7 +43,7 @@ button{
     align-items:center;
     border-left:5px solid #667eea;
 }
-body.dark .bookmark{
+body.dark .bookmark, body.dark .label-item{
     background:#2a2a2a;
 }
 a{font-weight:bold;}
@@ -52,12 +51,10 @@ hr{margin:15px 0;}
 .small{font-size:12px;color:#666;}
 </style>
 </head>
-
 <body>
 
 <div class="container">
 <h2>Bookmark Manager</h2>
-
 <button onclick="toggleDark()">Dark Mode</button>
 
 <!-- FILTER -->
@@ -66,19 +63,20 @@ hr{margin:15px 0;}
 <hr>
 
 <!-- ADD BOOKMARK -->
-<input id="name" placeholder="Website Name">
+<input id="name" placeholder="Name">
 <input id="url" placeholder="Website URL">
-
 <select id="label"></select>
-
-<!-- ADD NEW LABEL -->
-<input id="newLabel" placeholder="Add new label (optional)">
-<button onclick="addLabel()">Add Label</button>
-
 <button onclick="saveBookmark()">Add / Update Bookmark</button>
 
 <hr>
 
+<!-- MANAGE LABELS -->
+<h3>Labels</h3>
+<input id="newLabel" placeholder="Add new label">
+<button onclick="addLabel()">Add Label</button>
+<div id="labelList"></div>
+
+<hr>
 <button onclick="exportTxt()">Export</button>
 <input type="file" accept=".txt" onchange="importTxt(event)">
 
@@ -89,11 +87,13 @@ hr{margin:15px 0;}
 let bookmarks = JSON.parse(localStorage.getItem("bookmarks")) || [];
 let labels = JSON.parse(localStorage.getItem("labels")) || ["Everyone","Alone"];
 let editIndex = -1;
+let editLabelIndex = -1;
 
 /* INIT */
 function init(){
     updateLabelDropdowns();
     render();
+    renderLabels();
 }
 init();
 
@@ -118,16 +118,66 @@ function updateLabelDropdowns(){
     localStorage.setItem("labels", JSON.stringify(labels));
 }
 
-/* Add new label */
-function addLabel(){
-    const newLabel = document.getElementById("newLabel").value.trim();
-    if(!newLabel) return alert("Enter label name");
-    if(labels.includes(newLabel)) return alert("Label already exists");
+/* Render Labels list with edit/delete */
+function renderLabels(){
+    const list = document.getElementById("labelList");
+    list.innerHTML="";
+    labels.forEach((l,i)=>{
+        const div = document.createElement("div");
+        div.className="label-item";
+        div.innerHTML = `
+            <span>${l}</span>
+            <div>
+                <button onclick="editLabel(${i})">Edit</button>
+                <button onclick="deleteLabel(${i})">Delete</button>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
 
-    labels.push(newLabel);
-    document.getElementById("newLabel").value="";
+/* Add/Edit Label */
+function addLabel(){
+    const input = document.getElementById("newLabel");
+    const newLabel = input.value.trim();
+    if(!newLabel) return alert("Enter label name");
+    if(labels.includes(newLabel) && editLabelIndex === -1) return alert("Label already exists");
+
+    if(editLabelIndex === -1){
+        labels.push(newLabel);
+    } else {
+        const oldLabel = labels[editLabelIndex];
+        labels[editLabelIndex] = newLabel;
+        // Update bookmarks with old label name
+        bookmarks.forEach(b=>{
+            if(b.label === oldLabel) b.label = newLabel;
+        });
+        editLabelIndex = -1;
+    }
+    input.value="";
     updateLabelDropdowns();
-    alert("Label added");
+    renderLabels();
+    render();
+}
+
+/* Edit Label */
+function editLabel(i){
+    document.getElementById("newLabel").value = labels[i];
+    editLabelIndex = i;
+}
+
+/* Delete Label */
+function deleteLabel(i){
+    const labelToDelete = labels[i];
+    if(confirm(`Delete label "${labelToDelete}"? All bookmarks with this label will be moved to "Everyone".`)){
+        labels.splice(i,1);
+        bookmarks.forEach(b=>{
+            if(b.label === labelToDelete) b.label = "Everyone";
+        });
+        updateLabelDropdowns();
+        renderLabels();
+        render();
+    }
 }
 
 /* Save Bookmark */
@@ -141,15 +191,13 @@ function saveBookmark(){
         return;
     }
 
-    const data = {name,url,label};
-
+    const data = {name, url, label};
     if(editIndex === -1){
         bookmarks.push(data);
-    }else{
+    } else {
         bookmarks[editIndex] = data;
         editIndex = -1;
     }
-
     localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
     clearInputs();
     render();
@@ -157,12 +205,12 @@ function saveBookmark(){
 
 /* Clear inputs */
 function clearInputs(){
-    name.value="";
-    url.value="";
-    label.selectedIndex=0;
+    document.getElementById("name").value="";
+    document.getElementById("url").value="";
+    document.getElementById("label").selectedIndex=0;
 }
 
-/* Render with filter */
+/* Render Bookmarks */
 function render(){
     const list = document.getElementById("list");
     const filter = document.getElementById("filter").value;
@@ -170,7 +218,6 @@ function render(){
 
     bookmarks.forEach((b,i)=>{
         if(filter !== "All" && b.label !== filter) return;
-
         const div = document.createElement("div");
         div.className="bookmark";
         div.innerHTML=`
@@ -187,15 +234,15 @@ function render(){
     });
 }
 
-/* Edit */
+/* Edit Bookmark */
 function editBookmark(i){
-    name.value = bookmarks[i].name;
-    url.value = bookmarks[i].url;
-    label.value = bookmarks[i].label;
+    document.getElementById("name").value = bookmarks[i].name;
+    document.getElementById("url").value = bookmarks[i].url;
+    document.getElementById("label").value = bookmarks[i].label;
     editIndex = i;
 }
 
-/* Delete */
+/* Delete Bookmark */
 function deleteBookmark(i){
     if(confirm("Delete bookmark?")){
         bookmarks.splice(i,1);
@@ -204,7 +251,7 @@ function deleteBookmark(i){
     }
 }
 
-/* Export */
+/* Export Bookmarks */
 function exportTxt(){
     if(bookmarks.length===0) return alert("No data");
     const text = bookmarks.map(b=>`${b.name}|${b.url}|${b.label}`).join("\n");
@@ -215,7 +262,7 @@ function exportTxt(){
     a.click();
 }
 
-/* Import */
+/* Import Bookmarks */
 function importTxt(e){
     const file = e.target.files[0];
     if(!file) return;
@@ -235,11 +282,11 @@ function importTxt(e){
         });
         localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
         updateLabelDropdowns();
+        renderLabels();
         render();
     };
     reader.readAsText(file);
 }
 </script>
-
 </body>
 </html>
