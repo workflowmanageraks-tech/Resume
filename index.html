@@ -2,214 +2,243 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AKS Server</title>
+<title>Bookmark Manager</title>
 
 <style>
-:root{
---bg:#f4f6ff;
---card:#ffffff;
---text:#333;
---accent:#667eea;
-}
-.dark{
---bg:#121212;
---card:#1f1f1f;
---text:#f1f1f1;
---accent:#9aa8ff;
-}
-*{box-sizing:border-box;font-family:Segoe UI}
 body{
-margin:0;
-min-height:100vh;
-background:var(--bg);
-display:flex;
-justify-content:center;
-align-items:center;
-padding:20px;
-color:var(--text)
+    font-family: Arial, sans-serif;
+    background:#f4f6f9;
+    padding:20px;
+    transition:0.3s;
 }
-.app{
-width:100%;
-max-width:900px;
-background:var(--card);
-border-radius:16px;
-padding:25px;
-box-shadow:0 20px 40px rgba(0,0,0,.25)
+body.dark{
+    background:#121212;
+    color:#eee;
 }
-h1{text-align:center}
-textarea,input,select,button{
-width:100%;
-padding:12px;
-border-radius:10px;
-margin-top:10px;
-font-size:14px
+.container{
+    max-width:720px;
+    margin:auto;
+    background:#fff;
+    padding:20px;
+    border-radius:10px;
 }
-button{border:none;cursor:pointer}
-.add-btn{background:var(--accent);color:#fff}
-.export-btn{background:#2ecc71;color:#fff}
-.dark-btn{background:#000;color:#fff;margin-bottom:10px}
-.notes{margin-top:20px}
-.note{
-background:var(--bg);
-border-left:6px solid var(--accent);
-padding:15px;
-border-radius:10px;
-margin-bottom:15px
+body.dark .container{
+    background:#1e1e1e;
 }
-.completed{text-decoration:line-through;opacity:.6}
-.priority-high{border-left-color:#e74c3c}
-.priority-medium{border-left-color:#f1c40f}
-.priority-low{border-left-color:#2ecc71}
-.note-actions button{
-width:auto;
-padding:6px 10px;
-font-size:12px;
-margin-right:5px
+input, select{
+    width:100%;
+    padding:8px;
+    margin:6px 0;
 }
+button{
+    padding:8px 12px;
+    margin:5px 5px 5px 0;
+    cursor:pointer;
+}
+.bookmark{
+    background:#eef;
+    padding:10px;
+    margin-top:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-left:5px solid #667eea;
+}
+body.dark .bookmark{
+    background:#2a2a2a;
+}
+a{font-weight:bold;}
+hr{margin:15px 0;}
+.small{font-size:12px;color:#666;}
 </style>
 </head>
+
 <body>
 
-<div class="app">
-<h1>AKS Server</h1>
+<div class="container">
+<h2>Bookmark Manager</h2>
 
-<button class="dark-btn" onclick="toggleDark()">Dark Mode</button>
+<button onclick="toggleDark()">Dark Mode</button>
 
-<textarea id="noteInput" placeholder="Write task..."></textarea>
-<input type="datetime-local" id="reminderTime">
+<!-- FILTER -->
+<select id="filter" onchange="render()"></select>
 
-<select id="repeatType">
-<option value="none">One Time</option>
-<option value="daily">Daily</option>
-<option value="weekly">Weekly</option>
-</select>
+<hr>
 
-<select id="priority">
-<option value="high">High Priority</option>
-<option value="medium">Medium Priority</option>
-<option value="low">Low Priority</option>
-</select>
+<!-- ADD BOOKMARK -->
+<input id="name" placeholder="Website Name">
+<input id="url" placeholder="Website URL">
 
-<button class="add-btn" onclick="addTask()">Add Task</button>
-<button class="export-btn" onclick="exportTasks()">Export TXT</button>
+<select id="label"></select>
 
-<input id="search" placeholder="Search task..." oninput="render()">
+<!-- ADD NEW LABEL -->
+<input id="newLabel" placeholder="Add new label (optional)">
+<button onclick="addLabel()">Add Label</button>
 
-<div class="notes" id="list"></div>
+<button onclick="saveBookmark()">Add / Update Bookmark</button>
+
+<hr>
+
+<button onclick="exportTxt()">Export</button>
+<input type="file" accept=".txt" onchange="importTxt(event)">
+
+<div id="list"></div>
 </div>
 
-<audio id="alarm">
-<source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg">
-</audio>
+<script>
+let bookmarks = JSON.parse(localStorage.getItem("bookmarks")) || [];
+let labels = JSON.parse(localStorage.getItem("labels")) || ["Everyone","Alone"];
+let editIndex = -1;
 
-<script type="module">
-/* ---------------- FIREBASE SETUP ---------------- */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+/* INIT */
+function init(){
+    updateLabelDropdowns();
+    render();
+}
+init();
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDgJUc5BGEl2ABhs1FfHnjWQ3-9X8EG7Y4",
-  authDomain: "aks-server-fd7cf.firebaseapp.com",
-  projectId: "aks-server-fd7cf",
-  storageBucket: "aks-server-fd7cf.firebasestorage.app",
-  messagingSenderId: "2505156516",
-  appId: "1:2505156516:web:d8ec59327481c9dc8c0331",
-  measurementId: "G-BCL25V0MNY"
-};
+/* Dark Mode */
+function toggleDark(){
+    document.body.classList.toggle("dark");
+}
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-signInAnonymously(auth);
+/* Update Label dropdowns */
+function updateLabelDropdowns(){
+    const labelSelect = document.getElementById("label");
+    const filterSelect = document.getElementById("filter");
 
-/* ---------------- APP LOGIC ---------------- */
-let tasks = JSON.parse(localStorage.getItem("aks_tasks")) || [];
-let uid = null;
+    labelSelect.innerHTML="";
+    filterSelect.innerHTML="<option value='All'>Show All</option>";
 
-onAuthStateChanged(auth, async user=>{
-  if(user){
-    uid = user.uid;
-    const snap = await getDoc(doc(db,"users",uid));
-    if(snap.exists()){
-      tasks = snap.data().tasks || [];
-      localStorage.setItem("aks_tasks",JSON.stringify(tasks));
-      render();
+    labels.forEach(l=>{
+        labelSelect.innerHTML += `<option value="${l}">${l}</option>`;
+        filterSelect.innerHTML += `<option value="${l}">${l}</option>`;
+    });
+
+    localStorage.setItem("labels", JSON.stringify(labels));
+}
+
+/* Add new label */
+function addLabel(){
+    const newLabel = document.getElementById("newLabel").value.trim();
+    if(!newLabel) return alert("Enter label name");
+    if(labels.includes(newLabel)) return alert("Label already exists");
+
+    labels.push(newLabel);
+    document.getElementById("newLabel").value="";
+    updateLabelDropdowns();
+    alert("Label added");
+}
+
+/* Save Bookmark */
+function saveBookmark(){
+    const name = document.getElementById("name").value.trim();
+    const url = document.getElementById("url").value.trim();
+    const label = document.getElementById("label").value;
+
+    if(!name || !url){
+        alert("Name & URL required");
+        return;
     }
-  }
-});
 
-function save(){
-  localStorage.setItem("aks_tasks",JSON.stringify(tasks));
-  if(uid){
-    setDoc(doc(db,"users",uid),{tasks});
-  }
+    const data = {name,url,label};
+
+    if(editIndex === -1){
+        bookmarks.push(data);
+    }else{
+        bookmarks[editIndex] = data;
+        editIndex = -1;
+    }
+
+    localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
+    clearInputs();
+    render();
 }
 
-window.toggleDark=()=>{
-  document.body.classList.toggle("dark");
-};
+/* Clear inputs */
+function clearInputs(){
+    name.value="";
+    url.value="";
+    label.selectedIndex=0;
+}
 
-window.addTask=()=>{
-  if(!noteInput.value.trim())return;
-  tasks.unshift({
-    text:noteInput.value,
-    reminder:reminderTime.value||null,
-    repeat:repeatType.value,
-    priority:priority.value,
-    done:false
-  });
-  noteInput.value="";
-  save();
-  render();
-};
-
-window.toggleDone=i=>{
-  tasks[i].done=!tasks[i].done;
-  save();render();
-};
-
-window.snooze=i=>{
-  tasks[i].reminder=new Date(Date.now()+300000).toISOString();
-  save();
-  alert("Snoozed 5 minutes");
-};
-
-window.removeTask=i=>{
-  tasks.splice(i,1);
-  save();render();
-};
-
+/* Render with filter */
 function render(){
-  list.innerHTML="";
-  const q=search.value.toLowerCase();
-  tasks.filter(t=>t.text.toLowerCase().includes(q)).forEach((t,i)=>{
-    list.innerHTML+=`
-    <div class="note priority-${t.priority} ${t.done?'completed':''}">
-      <input type="checkbox" ${t.done?'checked':''} onclick="toggleDone(${i})">
-      ${t.text}
-      <small>${t.reminder?new Date(t.reminder).toLocaleString():""}</small>
-      <div class="note-actions">
-        <button onclick="snooze(${i})">Snooze</button>
-        <button onclick="removeTask(${i})">Delete</button>
-      </div>
-    </div>`;
-  });
+    const list = document.getElementById("list");
+    const filter = document.getElementById("filter").value;
+    list.innerHTML="";
+
+    bookmarks.forEach((b,i)=>{
+        if(filter !== "All" && b.label !== filter) return;
+
+        const div = document.createElement("div");
+        div.className="bookmark";
+        div.innerHTML=`
+            <div>
+                <a href="${b.url}" target="_blank">${b.name}</a><br>
+                <span class="small">Label: ${b.label}</span>
+            </div>
+            <div>
+                <button onclick="editBookmark(${i})">Edit</button>
+                <button onclick="deleteBookmark(${i})">Delete</button>
+            </div>
+        `;
+        list.appendChild(div);
+    });
 }
 
-window.exportTasks=()=>{
-  let t="AKS SERVER TASKS\n\n";
-  tasks.forEach((x,i)=>{
-    t+=`${i+1}. ${x.text} [${x.priority}] ${x.done?"✓":""}\n`;
-  });
-  const b=new Blob([t],{type:"text/plain"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(b);
-  a.download="aks_tasks.txt";
-  a.click();
-};
+/* Edit */
+function editBookmark(i){
+    name.value = bookmarks[i].name;
+    url.value = bookmarks[i].url;
+    label.value = bookmarks[i].label;
+    editIndex = i;
+}
 
-render();
+/* Delete */
+function deleteBookmark(i){
+    if(confirm("Delete bookmark?")){
+        bookmarks.splice(i,1);
+        localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
+        render();
+    }
+}
+
+/* Export */
+function exportTxt(){
+    if(bookmarks.length===0) return alert("No data");
+    const text = bookmarks.map(b=>`${b.name}|${b.url}|${b.label}`).join("\n");
+    const blob = new Blob([text],{type:"text/plain"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download="bookmarks.txt";
+    a.click();
+}
+
+/* Import */
+function importTxt(e){
+    const file = e.target.files[0];
+    if(!file) return;
+
+    const reader = new FileReader();
+    reader.onload = ()=>{
+        reader.result.split("\n").forEach(line=>{
+            const [name,url,label] = line.split("|");
+            if(name && url){
+                if(label && !labels.includes(label)) labels.push(label);
+                bookmarks.push({
+                    name:name.trim(),
+                    url:url.trim(),
+                    label:label?.trim() || "Everyone"
+                });
+            }
+        });
+        localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
+        updateLabelDropdowns();
+        render();
+    };
+    reader.readAsText(file);
+}
 </script>
 
 </body>
