@@ -31,7 +31,7 @@ input, select{
 }
 button{
     padding:6px 10px;
-    margin:3px 3px 3px 0;
+    margin:4px 4px 4px 0;
     cursor:pointer;
 }
 .bookmark, .label-item{
@@ -77,7 +77,9 @@ hr{margin:15px 0;}
 <div id="labelList"></div>
 
 <hr>
-<button onclick="exportData()">Export (App Compatible)</button>
+
+<button onclick="exportData()">Export (Text)</button>
+<button onclick="shareFile()">Share File (.txt)</button>
 <input type="file" accept=".txt" onchange="importTxt(event)">
 
 <div id="list"></div>
@@ -242,26 +244,41 @@ function deleteBookmark(i){
     }
 }
 
-/* APP-COMPATIBLE EXPORT */
+/* TEXT EXPORT (APP SAFE) */
 function exportData(){
-    if(bookmarks.length === 0){
-        alert("No data");
-        return;
-    }
+    if(bookmarks.length === 0) return alert("No data");
 
     const text = bookmarks.map(b =>
         `${b.name}|${b.url}|${b.label}`
     ).join("\n");
 
     if(navigator.share){
+        navigator.share({ title:"Bookmarks", text:text });
+    } else {
+        navigator.clipboard.writeText(text);
+        alert("Copied to clipboard");
+    }
+}
+
+/* DIRECT FILE SHARE */
+function shareFile(){
+    if(bookmarks.length === 0) return alert("No data");
+
+    const text = bookmarks.map(b =>
+        `${b.name}|${b.url}|${b.label}`
+    ).join("\n");
+
+    const file = new File([text], "bookmarks.txt", {
+        type: "text/plain"
+    });
+
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
         navigator.share({
-            title: "Bookmarks",
-            text: text
+            files:[file],
+            title:"Bookmarks File"
         });
     } else {
-        navigator.clipboard.writeText(text).then(()=>{
-            alert("Copied to clipboard. Paste & save anywhere.");
-        });
+        alert("File sharing not supported on this device");
     }
 }
 
