@@ -46,7 +46,10 @@ button{
 body.dark .bookmark, body.dark .label-item{
     background:#2a2a2a;
 }
-a{font-weight:bold;}
+a{
+    font-weight:bold;
+    cursor:pointer;
+}
 hr{margin:15px 0;}
 .small{font-size:12px;color:#666;}
 </style>
@@ -57,12 +60,10 @@ hr{margin:15px 0;}
 <h2>Bookmark Manager</h2>
 <button onclick="toggleDark()">Dark Mode</button>
 
-<!-- FILTER -->
 <select id="filter" onchange="render()"></select>
 
 <hr>
 
-<!-- ADD BOOKMARK -->
 <input id="name" placeholder="Name">
 <input id="url" placeholder="Website URL">
 <select id="label"></select>
@@ -70,14 +71,13 @@ hr{margin:15px 0;}
 
 <hr>
 
-<!-- MANAGE LABELS -->
 <h3>Labels</h3>
 <input id="newLabel" placeholder="Add new label">
 <button onclick="addLabel()">Add Label</button>
 <div id="labelList"></div>
 
 <hr>
-<button onclick="exportTxt()">Export</button>
+<button onclick="exportData()">Export (App Compatible)</button>
 <input type="file" accept=".txt" onchange="importTxt(event)">
 
 <div id="list"></div>
@@ -89,7 +89,6 @@ let labels = JSON.parse(localStorage.getItem("labels")) || ["Everyone","Alone"];
 let editIndex = -1;
 let editLabelIndex = -1;
 
-/* INIT */
 function init(){
     updateLabelDropdowns();
     render();
@@ -97,12 +96,10 @@ function init(){
 }
 init();
 
-/* Dark Mode */
 function toggleDark(){
     document.body.classList.toggle("dark");
 }
 
-/* Update Label dropdowns */
 function updateLabelDropdowns(){
     const labelSelect = document.getElementById("label");
     const filterSelect = document.getElementById("filter");
@@ -118,7 +115,6 @@ function updateLabelDropdowns(){
     localStorage.setItem("labels", JSON.stringify(labels));
 }
 
-/* Render Labels list with edit/delete */
 function renderLabels(){
     const list = document.getElementById("labelList");
     list.innerHTML="";
@@ -136,40 +132,37 @@ function renderLabels(){
     });
 }
 
-/* Add/Edit Label */
 function addLabel(){
     const input = document.getElementById("newLabel");
     const newLabel = input.value.trim();
     if(!newLabel) return alert("Enter label name");
-    if(labels.includes(newLabel) && editLabelIndex === -1) return alert("Label already exists");
 
     if(editLabelIndex === -1){
+        if(labels.includes(newLabel)) return alert("Label already exists");
         labels.push(newLabel);
     } else {
         const oldLabel = labels[editLabelIndex];
         labels[editLabelIndex] = newLabel;
-        // Update bookmarks with old label name
         bookmarks.forEach(b=>{
             if(b.label === oldLabel) b.label = newLabel;
         });
         editLabelIndex = -1;
     }
+
     input.value="";
     updateLabelDropdowns();
     renderLabels();
     render();
 }
 
-/* Edit Label */
 function editLabel(i){
     document.getElementById("newLabel").value = labels[i];
     editLabelIndex = i;
 }
 
-/* Delete Label */
 function deleteLabel(i){
     const labelToDelete = labels[i];
-    if(confirm(`Delete label "${labelToDelete}"? All bookmarks with this label will be moved to "Everyone".`)){
+    if(confirm(`Delete label "${labelToDelete}"?`)){
         labels.splice(i,1);
         bookmarks.forEach(b=>{
             if(b.label === labelToDelete) b.label = "Everyone";
@@ -180,16 +173,12 @@ function deleteLabel(i){
     }
 }
 
-/* Save Bookmark */
 function saveBookmark(){
     const name = document.getElementById("name").value.trim();
     const url = document.getElementById("url").value.trim();
     const label = document.getElementById("label").value;
 
-    if(!name || !url){
-        alert("Name & URL required");
-        return;
-    }
+    if(!name || !url) return alert("Name & URL required");
 
     const data = {name, url, label};
     if(editIndex === -1){
@@ -198,19 +187,18 @@ function saveBookmark(){
         bookmarks[editIndex] = data;
         editIndex = -1;
     }
+
     localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
     clearInputs();
     render();
 }
 
-/* Clear inputs */
 function clearInputs(){
     document.getElementById("name").value="";
     document.getElementById("url").value="";
     document.getElementById("label").selectedIndex=0;
 }
 
-/* Render Bookmarks */
 function render(){
     const list = document.getElementById("list");
     const filter = document.getElementById("filter").value;
@@ -218,11 +206,12 @@ function render(){
 
     bookmarks.forEach((b,i)=>{
         if(filter !== "All" && b.label !== filter) return;
+
         const div = document.createElement("div");
         div.className="bookmark";
         div.innerHTML=`
             <div>
-                <a href="${b.url}" target="_blank">${b.name}</a><br>
+                <a onclick="openLink('${b.url}')">${b.name}</a><br>
                 <span class="small">Label: ${b.label}</span>
             </div>
             <div>
@@ -234,7 +223,10 @@ function render(){
     });
 }
 
-/* Edit Bookmark */
+function openLink(url){
+    window.open(url, "_blank");
+}
+
 function editBookmark(i){
     document.getElementById("name").value = bookmarks[i].name;
     document.getElementById("url").value = bookmarks[i].url;
@@ -242,7 +234,6 @@ function editBookmark(i){
     editIndex = i;
 }
 
-/* Delete Bookmark */
 function deleteBookmark(i){
     if(confirm("Delete bookmark?")){
         bookmarks.splice(i,1);
@@ -251,18 +242,29 @@ function deleteBookmark(i){
     }
 }
 
-/* Export Bookmarks */
-function exportTxt(){
-    if(bookmarks.length===0) return alert("No data");
-    const text = bookmarks.map(b=>`${b.name}|${b.url}|${b.label}`).join("\n");
-    const blob = new Blob([text],{type:"text/plain"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download="bookmarks.txt";
-    a.click();
+/* APP-COMPATIBLE EXPORT */
+function exportData(){
+    if(bookmarks.length === 0){
+        alert("No data");
+        return;
+    }
+
+    const text = bookmarks.map(b =>
+        `${b.name}|${b.url}|${b.label}`
+    ).join("\n");
+
+    if(navigator.share){
+        navigator.share({
+            title: "Bookmarks",
+            text: text
+        });
+    } else {
+        navigator.clipboard.writeText(text).then(()=>{
+            alert("Copied to clipboard. Paste & save anywhere.");
+        });
+    }
 }
 
-/* Import Bookmarks */
 function importTxt(e){
     const file = e.target.files[0];
     if(!file) return;
@@ -288,5 +290,6 @@ function importTxt(e){
     reader.readAsText(file);
 }
 </script>
+
 </body>
 </html>
