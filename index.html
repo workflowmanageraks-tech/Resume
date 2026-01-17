@@ -225,13 +225,13 @@ function exportCopy(){
     alert("Copied to clipboard");
 }
 
-/* WHATSAPP – ANDROID INTENT (TEXT) */
+/* WHATSAPP – SPECIFIC NUMBER */
 function sendWhatsApp(){
     if(!bookmarks.length) return alert("No data");
-    const text=bookmarks.map(b=>`${b.name}\n${b.url}`).join("\n\n");
-    const intentUrl="intent://send?text="+encodeURIComponent(text)
-        +"#Intent;scheme=whatsapp;package=com.whatsapp;end";
-    window.location.href=intentUrl;
+    const text = bookmarks.map(b => `${b.name}\n${b.url}`).join("\n\n");
+    const phoneNumber = "919621755459"; // include country code, no '+'
+    const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
 }
 
 /* IMPORT TXT */
