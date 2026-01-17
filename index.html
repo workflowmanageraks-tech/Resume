@@ -8,12 +8,8 @@ body{
     font-family: Arial, sans-serif;
     background:#f4f6f9;
     padding:20px;
-    transition:0.3s;
 }
-body.dark{
-    background:#121212;
-    color:#eee;
-}
+body.dark{ background:#121212;color:#eee; }
 .container{
     max-width:720px;
     margin:auto;
@@ -21,37 +17,22 @@ body.dark{
     padding:20px;
     border-radius:10px;
 }
-body.dark .container{
-    background:#1e1e1e;
-}
-input, select{
-    width:100%;
-    padding:8px;
-    margin:6px 0;
-}
-button{
-    padding:6px 10px;
-    margin:4px 4px 4px 0;
-    cursor:pointer;
-}
-.bookmark, .label-item{
+body.dark .container{ background:#1e1e1e; }
+input,select{ width:100%;padding:8px;margin:6px 0; }
+button{ padding:6px 10px;margin:4px;cursor:pointer; }
+.bookmark,.label-item{
     background:#eef;
     padding:10px;
     margin-top:10px;
     display:flex;
     justify-content:space-between;
-    align-items:center;
     border-left:5px solid #667eea;
 }
-body.dark .bookmark, body.dark .label-item{
-    background:#2a2a2a;
-}
-a{
-    font-weight:bold;
-    cursor:pointer;
-}
+body.dark .bookmark,
+body.dark .label-item{ background:#2a2a2a; }
+a{ font-weight:bold; cursor:pointer; }
+.small{ font-size:12px;color:#666; }
 hr{margin:15px 0;}
-.small{font-size:12px;color:#666;}
 </style>
 </head>
 <body>
@@ -72,14 +53,16 @@ hr{margin:15px 0;}
 <hr>
 
 <h3>Labels</h3>
-<input id="newLabel" placeholder="Add new label">
-<button onclick="addLabel()">Add Label</button>
+<input id="newLabel" placeholder="Add / Edit label">
+<button onclick="addLabel()">Save Label</button>
 <div id="labelList"></div>
 
 <hr>
 
-<button onclick="exportData()">Export (Text)</button>
-<button onclick="shareFile()">Share File (.txt)</button>
+<!-- EXPORT OPTIONS -->
+<button onclick="exportDownload()">Export Text (Download)</button>
+<button onclick="exportCopy()">Export Text (Copy)</button>
+<button onclick="sendWhatsApp()">Send to WhatsApp</button>
 <input type="file" accept=".txt" onchange="importTxt(event)">
 
 <div id="list"></div>
@@ -87,70 +70,61 @@ hr{margin:15px 0;}
 
 <script>
 let bookmarks = JSON.parse(localStorage.getItem("bookmarks")) || [];
-let labels = JSON.parse(localStorage.getItem("labels")) || ["Everyone","Alone"];
-let editIndex = -1;
-let editLabelIndex = -1;
+let labels = JSON.parse(localStorage.getItem("labels")) || ["Everyone"];
+let editIndex = -1, editLabelIndex = -1;
+
+init();
 
 function init(){
     updateLabelDropdowns();
-    render();
     renderLabels();
+    render();
 }
-init();
 
 function toggleDark(){
     document.body.classList.toggle("dark");
 }
 
 function updateLabelDropdowns(){
-    const labelSelect = document.getElementById("label");
-    const filterSelect = document.getElementById("filter");
-
-    labelSelect.innerHTML="";
-    filterSelect.innerHTML="<option value='All'>Show All</option>";
-
+    const labelSel=document.getElementById("label");
+    const filterSel=document.getElementById("filter");
+    labelSel.innerHTML="";
+    filterSel.innerHTML="<option value='All'>Show All</option>";
     labels.forEach(l=>{
-        labelSelect.innerHTML += `<option value="${l}">${l}</option>`;
-        filterSelect.innerHTML += `<option value="${l}">${l}</option>`;
+        labelSel.innerHTML+=`<option value="${l}">${l}</option>`;
+        filterSel.innerHTML+=`<option value="${l}">${l}</option>`;
     });
-
-    localStorage.setItem("labels", JSON.stringify(labels));
+    localStorage.setItem("labels",JSON.stringify(labels));
 }
 
 function renderLabels(){
-    const list = document.getElementById("labelList");
-    list.innerHTML="";
+    const box=document.getElementById("labelList");
+    box.innerHTML="";
     labels.forEach((l,i)=>{
-        const div = document.createElement("div");
-        div.className="label-item";
-        div.innerHTML = `
+        box.innerHTML+=`
+        <div class="label-item">
             <span>${l}</span>
             <div>
                 <button onclick="editLabel(${i})">Edit</button>
                 <button onclick="deleteLabel(${i})">Delete</button>
             </div>
-        `;
-        list.appendChild(div);
+        </div>`;
     });
 }
 
 function addLabel(){
-    const input = document.getElementById("newLabel");
-    const newLabel = input.value.trim();
-    if(!newLabel) return alert("Enter label name");
-
-    if(editLabelIndex === -1){
-        if(labels.includes(newLabel)) return alert("Label already exists");
-        labels.push(newLabel);
-    } else {
-        const oldLabel = labels[editLabelIndex];
-        labels[editLabelIndex] = newLabel;
-        bookmarks.forEach(b=>{
-            if(b.label === oldLabel) b.label = newLabel;
-        });
-        editLabelIndex = -1;
+    const input=document.getElementById("newLabel");
+    const val=input.value.trim();
+    if(!val) return;
+    if(editLabelIndex===-1){
+        if(labels.includes(val)) return alert("Label exists");
+        labels.push(val);
+    }else{
+        const old=labels[editLabelIndex];
+        labels[editLabelIndex]=val;
+        bookmarks.forEach(b=>{ if(b.label===old) b.label=val; });
+        editLabelIndex=-1;
     }
-
     input.value="";
     updateLabelDropdowns();
     renderLabels();
@@ -158,17 +132,15 @@ function addLabel(){
 }
 
 function editLabel(i){
-    document.getElementById("newLabel").value = labels[i];
-    editLabelIndex = i;
+    document.getElementById("newLabel").value=labels[i];
+    editLabelIndex=i;
 }
 
 function deleteLabel(i){
-    const labelToDelete = labels[i];
-    if(confirm(`Delete label "${labelToDelete}"?`)){
+    const l=labels[i];
+    if(confirm("Delete label?")){
         labels.splice(i,1);
-        bookmarks.forEach(b=>{
-            if(b.label === labelToDelete) b.label = "Everyone";
-        });
+        bookmarks.forEach(b=>{ if(b.label===l) b.label="Everyone"; });
         updateLabelDropdowns();
         renderLabels();
         render();
@@ -176,133 +148,107 @@ function deleteLabel(i){
 }
 
 function saveBookmark(){
-    const name = document.getElementById("name").value.trim();
-    const url = document.getElementById("url").value.trim();
-    const label = document.getElementById("label").value;
+    const nameInput=document.getElementById("name");
+    const urlInput=document.getElementById("url");
+    const labelInput=document.getElementById("label");
 
-    if(!name || !url) return alert("Name & URL required");
+    const n=nameInput.value.trim();
+    const u=urlInput.value.trim();
+    const l=labelInput.value;
 
-    const data = {name, url, label};
-    if(editIndex === -1){
-        bookmarks.push(data);
-    } else {
-        bookmarks[editIndex] = data;
-        editIndex = -1;
-    }
+    if(!n||!u) return alert("Name & URL required");
 
-    localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
-    clearInputs();
+    const data={name:n,url:u,label:l};
+
+    if(editIndex===-1) bookmarks.push(data);
+    else{ bookmarks[editIndex]=data; editIndex=-1; }
+
+    localStorage.setItem("bookmarks",JSON.stringify(bookmarks));
+
+    nameInput.value=""; urlInput.value="";
+    labelInput.selectedIndex=0;
+
     render();
 }
 
-function clearInputs(){
-    document.getElementById("name").value="";
-    document.getElementById("url").value="";
-    document.getElementById("label").selectedIndex=0;
-}
-
 function render(){
-    const list = document.getElementById("list");
-    const filter = document.getElementById("filter").value;
+    const list=document.getElementById("list");
+    const f=document.getElementById("filter").value;
     list.innerHTML="";
-
     bookmarks.forEach((b,i)=>{
-        if(filter !== "All" && b.label !== filter) return;
-
-        const div = document.createElement("div");
-        div.className="bookmark";
-        div.innerHTML=`
+        if(f!=="All" && b.label!==f) return;
+        list.innerHTML+=`
+        <div class="bookmark">
             <div>
-                <a onclick="openLink('${b.url}')">${b.name}</a><br>
-                <span class="small">Label: ${b.label}</span>
+                <a href="${b.url}" target="_blank">${b.name}</a><br>
+                <span class="small">${b.label}</span>
             </div>
             <div>
                 <button onclick="editBookmark(${i})">Edit</button>
                 <button onclick="deleteBookmark(${i})">Delete</button>
             </div>
-        `;
-        list.appendChild(div);
+        </div>`;
     });
-}
-
-function openLink(url){
-    window.open(url, "_blank");
 }
 
 function editBookmark(i){
-    document.getElementById("name").value = bookmarks[i].name;
-    document.getElementById("url").value = bookmarks[i].url;
-    document.getElementById("label").value = bookmarks[i].label;
-    editIndex = i;
+    document.getElementById("name").value=bookmarks[i].name;
+    document.getElementById("url").value=bookmarks[i].url;
+    document.getElementById("label").value=bookmarks[i].label;
+    editIndex=i;
 }
 
 function deleteBookmark(i){
-    if(confirm("Delete bookmark?")){
+    if(confirm("Delete?")){
         bookmarks.splice(i,1);
-        localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
+        localStorage.setItem("bookmarks",JSON.stringify(bookmarks));
         render();
     }
 }
 
-/* TEXT EXPORT (APP SAFE) */
-function exportData(){
-    if(bookmarks.length === 0) return alert("No data");
-
-    const text = bookmarks.map(b =>
-        `${b.name}|${b.url}|${b.label}`
-    ).join("\n");
-
-    if(navigator.share){
-        navigator.share({ title:"Bookmarks", text:text });
-    } else {
-        navigator.clipboard.writeText(text);
-        alert("Copied to clipboard");
-    }
+/* EXPORT – DOWNLOAD */
+function exportDownload(){
+    if(!bookmarks.length) return alert("No data");
+    const text=bookmarks.map(b=>`${b.name}|${b.url}|${b.label}`).join("\n");
+    const blob=new Blob([text],{type:"text/plain"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="bookmarks.txt";
+    a.click();
 }
 
-/* DIRECT FILE SHARE */
-function shareFile(){
-    if(bookmarks.length === 0) return alert("No data");
-
-    const text = bookmarks.map(b =>
-        `${b.name}|${b.url}|${b.label}`
-    ).join("\n");
-
-    const file = new File([text], "bookmarks.txt", {
-        type: "text/plain"
-    });
-
-    if(navigator.canShare && navigator.canShare({ files:[file] })){
-        navigator.share({
-            files:[file],
-            title:"Bookmarks File"
-        });
-    } else {
-        alert("File sharing not supported on this device");
-    }
+/* EXPORT – COPY */
+function exportCopy(){
+    if(!bookmarks.length) return alert("No data");
+    const text=bookmarks.map(b=>`${b.name}|${b.url}|${b.label}`).join("\n");
+    navigator.clipboard.writeText(text);
+    alert("Copied to clipboard");
 }
 
+/* WHATSAPP – ANDROID INTENT (TEXT) */
+function sendWhatsApp(){
+    if(!bookmarks.length) return alert("No data");
+    const text=bookmarks.map(b=>`${b.name}\n${b.url}`).join("\n\n");
+    const intentUrl="intent://send?text="+encodeURIComponent(text)
+        +"#Intent;scheme=whatsapp;package=com.whatsapp;end";
+    window.location.href=intentUrl;
+}
+
+/* IMPORT TXT */
 function importTxt(e){
-    const file = e.target.files[0];
+    const file=e.target.files[0];
     if(!file) return;
-
-    const reader = new FileReader();
-    reader.onload = ()=>{
-        reader.result.split("\n").forEach(line=>{
-            const [name,url,label] = line.split("|");
-            if(name && url){
-                if(label && !labels.includes(label)) labels.push(label);
-                bookmarks.push({
-                    name:name.trim(),
-                    url:url.trim(),
-                    label:label?.trim() || "Everyone"
-                });
+    const reader=new FileReader();
+    reader.onload=()=>{
+        reader.result.split("\n").forEach(l=>{
+            const [n,u,lb]=l.split("|");
+            if(n&&u){
+                if(lb && !labels.includes(lb)) labels.push(lb);
+                bookmarks.push({name:n.trim(),url:u.trim(),label:lb||"Everyone"});
             }
         });
-        localStorage.setItem("bookmarks", JSON.stringify(bookmarks));
-        updateLabelDropdowns();
-        renderLabels();
-        render();
+        localStorage.setItem("bookmarks",JSON.stringify(bookmarks));
+        updateLabelDropdowns(); renderLabels(); render();
     };
     reader.readAsText(file);
 }
